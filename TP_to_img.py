@@ -4,6 +4,8 @@ import time
 import os
 import argparse
 import warnings
+import sys
+import gc
 
 # write a parser to set up the running from command line
 parser = argparse.ArgumentParser(description='Tranforms Trigger Primitives to images.')
@@ -263,6 +265,11 @@ def show_or_save_img(all_TPs, channel_map, show=False, save=False, save_path='TP
 def create_dataset(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50):
     '''
     :param clusters: list of clusters
+    :param make_fixed_size: if True, the image will have fixed size, otherwise it will be as big as the TPs
+    :param width: width of the image
+    :param height: height of the image
+    :param x_margin: margin on the x axis
+    :param y_margin: margin on the y axis
     :return: dataset [[img],[label]] in numpy array format
     '''
     dataset_img = np.array([from_tp_to_imgs(np.array(clusters[0]), make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)])
@@ -273,10 +280,7 @@ def create_dataset(clusters, make_fixed_size=True, width=70, height=1000, x_marg
         dataset_label[0, 0] = 10
     else:
         dataset_label[0, 0] = cluster[0, 7]
-    a=1
     for cluster in clusters[1:]:
-        print(a)
-        a+=1
         # create the image
         cluster = np.array(cluster)
         img = from_tp_to_imgs(cluster, make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)
@@ -288,10 +292,121 @@ def create_dataset(clusters, make_fixed_size=True, width=70, height=1000, x_marg
         # append to the dataset as an array of arrays
         dataset_img = np.concatenate((dataset_img, np.array([img])), axis=0)
         dataset_label = np.concatenate((dataset_label, np.array([[label]])), axis=0)
+    print( dataset_img.size * dataset_img.itemsize/10e9)
+    print(sys.getsizeof(dataset_img[0]))
+    print(dataset_img.shape)
     return (dataset_img, dataset_label)
 
+def create_dataset2(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50):
+    '''
+    :param clusters: list of clusters
+    :param make_fixed_size: if True, the image will have fixed size, otherwise it will be as big as the TPs
+    :param width: width of the image
+    :param height: height of the image
+    :param x_margin: margin on the x axis
+    :param y_margin: margin on the y axis
+    :return: dataset [[img],[label]] in numpy array format
+    '''
+    dataset_img = []
+    dataset_label = []
+
+    for i, cluster in enumerate(clusters):
+        # create the image
+        img = from_tp_to_imgs(np.array(cluster), make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)
+        # create the label
+        if len(np.unique(np.array(cluster)[:, 7])) > 1:
+            label = 10
+        else:
+            label = cluster[0][7]        
+        # append to the dataset as an array of arrays
+        dataset_img.append(img)
+        dataset_label.append([label])
+    print(sys.getsizeof(dataset_img))
+    print(sys.getsizeof(dataset_img[0]))
+    print(sys.getsizeof(dataset_img[0][0]))
+    print(sys.getsizeof(dataset_img[0][0][0]))
+    
+    print((sys.getsizeof(dataset_img) * sys.getsizeof(dataset_img[0]))/10e9)
+    return (dataset_img, dataset_label)
+
+def create_dataset3(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50):
+    '''
+    :param clusters: list of clusters
+    :param make_fixed_size: if True, the image will have fixed size, otherwise it will be as big as the TPs
+    :param width: width of the image
+    :param height: height of the image
+    :param x_margin: margin on the x axis
+    :param y_margin: margin on the y axis
+    :return: dataset [[img],[label]] in numpy array format
+    '''
+    dataset_img = []
+    dataset_label = []
+
+    dataset_img_np = np.array([from_tp_to_imgs(np.array(clusters[0]), make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)])
+    dataset_label_np = np.array([[-1]])
+    cluster = np.array(clusters[0])
+    if len(np.unique(cluster[:, 7])) > 1:
+        dataset_label_np[0, 0] = 10
+    else:
+        dataset_label_np[0, 0] = cluster[0, 7]
+
+    for i, cluster in enumerate(clusters[1:]):
+        # create the image
+        img = from_tp_to_imgs(np.array(cluster), make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)
+        # create the label
+        if len(np.unique(np.array(cluster)[:, 7])) > 1:
+            label = 10
+        else:
+            label = cluster[0][7]        
+        # append to the dataset as an array of arrays
+        dataset_img.append(img)
+        dataset_label.append([label])
+        if i%1000 == 0:
+            dataset_img_np = np.concatenate((dataset_img_np, np.array(dataset_img)), axis=0)
+            dataset_label_np = np.concatenate((dataset_label_np, np.array(dataset_label)), axis=0)
+            dataset_img = []
+            dataset_label = []
+
+    dataset_img_np = np.concatenate((dataset_img_np, np.array(dataset_img)), axis=0)
+    dataset_label_np = np.concatenate((dataset_label_np, np.array(dataset_label)), axis=0)
+    dataset_img.clear()
+    dataset_label.clear()
+
+    print( dataset_img_np.size * dataset_img_np.itemsize/10e9)
+    print(sys.getsizeof(dataset_img_np[0]))
 
 
+    return (dataset_img_np, dataset_label_np)
+
+def create_dataset4(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50):
+    '''
+    :param clusters: list of clusters
+    :param make_fixed_size: if True, the image will have fixed size, otherwise it will be as big as the TPs
+    :param width: width of the image
+    :param height: height of the image
+    :param x_margin: margin on the x axis
+    :param y_margin: margin on the y axis
+    :return: dataset [[img],[label]] in numpy array format
+    '''
+    # create the full array beforehands
+    dataset_img = np.empty((len(clusters), height, width))
+    dataset_label = np.empty((len(clusters), 1))
+
+    # for i,  cluster in enumerate(clusters):
+    #     # create the image
+    #     img = from_tp_to_imgs(np.array(cluster), make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)
+    #     # create the label
+    #     if len(np.unique(np.array(cluster)[:, 7])) > 1:
+    #         label = 10
+    #     else:
+    #         label = cluster[0][7]        
+    #     # append to the dataset as an array of arrays
+    #     dataset_img[i] = img
+    #     dataset_label[i] = [label]
+
+    print( dataset_img.size * dataset_img.itemsize/10e9)
+
+    return (dataset_img, dataset_label)
 
 
 if __name__=='__main__':
@@ -344,8 +459,29 @@ if __name__=='__main__':
     print('Types: ', hist_types)
 
     # create the dataset
-    dataset_img, dataset_label = create_dataset(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50)
+    # print('-------- Numpy version --------')
+    # dataset_img, dataset_label = create_dataset(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50)
+    # print('--------- Python list version --------')
+    # dataset_img, dataset_label = create_dataset2(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50)
+    # # sleep(10)]
+    # time.sleep(5)
 
-    np.save('dataset.npy', dataset_img)
-    np.save('labels.npy', dataset_label)
+    # print('--------- Python list version with numpy array --------')
+    # dataset_img, dataset_label = create_dataset3(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50)
+
+    print('--------- Python list version with numpy array and preallocated array --------')
+    dataset_img, dataset_label = create_dataset4(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50)
+
+
+    print('Dataset shape: ', (dataset_img).shape)
+    print('Labels shape: ', (dataset_label).shape)
+
+    np.save('dataset_img.npy', dataset_img)
+    np.save('dataset_lab.npy', dataset_label)
+
+    print("Done!")
+
+
+
+
 
