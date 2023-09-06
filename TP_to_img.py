@@ -11,6 +11,7 @@ parser.add_argument('-filename', type=str, default='fd-snb-mc-hits/snana_hits_ap
 parser.add_argument('-chanmap', type=str, default='FDHDChannelMap_v1_wireends.txt', help='path to the file with Channel Map')
 parser.add_argument('-show', action='store_true', help='show the image')
 parser.add_argument('-save', action='store_true', help='save the image')
+parser.add_argument('-write', action='store_true', help='write the clusters to a file')
 parser.add_argument('-save_path', type=str, default='images/', help='path to save the image')
 parser.add_argument('-n_events', type=int, default=0, help='number of events to process')
 
@@ -20,6 +21,7 @@ filename = args.filename
 chanMap = args.chanmap
 show = args.show
 save = args.save
+write = args.write
 save_path = args.save_path
 n_events = args.n_events
 
@@ -182,7 +184,7 @@ def all_views_img_maker(tps, channel_map, min_tps=2, make_fixed_size=False, widt
 
 
 
-def cluster_maker(all_tps, channel_map, ticks_limit=100, channel_limit=20, min_hits=3):
+def cluster_maker(all_tps, channel_map, ticks_limit=100, channel_limit=20, min_hits=4):
     '''
     :param all_tps: all trigger primitives in the event
     :param channel_map: channel map
@@ -197,6 +199,7 @@ def cluster_maker(all_tps, channel_map, ticks_limit=100, channel_limit=20, min_h
     buffer = []
     # loop over the TPs
     for tp in all_tps:
+        tp = [tp[0], tp[1], tp[2], tp[3], tp[4], tp[5], tp[6], tp[7]]
         if len(buffer) == 0:
             buffer.append([tp])
         else:
@@ -209,11 +212,11 @@ def cluster_maker(all_tps, channel_map, ticks_limit=100, channel_limit=20, min_h
                         elem.append(tp)
                         appended = True
                     buffer.append(elem)
-                elif len(elem) > min_hits:
+                elif len(elem) >= min_hits:
                     clusters.append(elem)
             if not appended:
                 buffer.append([tp])
-
+    
     return clusters
 
 
@@ -257,6 +260,38 @@ def show_or_save_img(all_TPs, channel_map, show=False, save=False, save_path='TP
             plt.imsave(save_path + 'x_' + os.path.basename(outname) + '.png', img_x)
 
 
+def create_dataset(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50):
+    '''
+    :param clusters: list of clusters
+    :return: dataset [[img],[label]] in numpy array format
+    '''
+    dataset_img = np.array([from_tp_to_imgs(np.array(clusters[0]), make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)])
+    dataset_label = np.array([[-1]])
+    img = from_tp_to_imgs(np.array(clusters[0]))
+    cluster = np.array(clusters[0])
+    if len(np.unique(cluster[:, 7])) > 1:
+        dataset_label[0, 0] = 10
+    else:
+        dataset_label[0, 0] = cluster[0, 7]
+    a=1
+    for cluster in clusters[1:]:
+        print(a)
+        a+=1
+        # create the image
+        cluster = np.array(cluster)
+        img = from_tp_to_imgs(cluster, make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)
+        # create the label
+        if len(np.unique(cluster[:, 7])) > 1:
+            label = 10
+        else:
+            label = cluster[0, 7]        
+        # append to the dataset as an array of arrays
+        dataset_img = np.concatenate((dataset_img, np.array([img])), axis=0)
+        dataset_label = np.concatenate((dataset_label, np.array([[label]])), axis=0)
+    return (dataset_img, dataset_label)
+
+
+
 
 
 if __name__=='__main__':
@@ -273,17 +308,44 @@ if __name__=='__main__':
     channel_map = create_channel_map_array(chanMap)
 
     #create images
-    clusters = cluster_maker(all_TPs, channel_map, ticks_limit=150, channel_limit=20, min_hits=3)
+    clusters = cluster_maker(all_TPs, channel_map, ticks_limit=150, channel_limit=20, min_hits=2)
     print('Number of clusters: ', len(clusters))
-    for i, cluster in enumerate(clusters):
-        show_or_save_img(np.array(cluster), channel_map, show=show, save=save, save_path=save_path, outname='test'+str(i), min_tps=2, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50)
+    if show or save:    
+        for i, cluster in enumerate(clusters):
+            show_or_save_img(np.array(cluster), channel_map, show=show, save=save, save_path=save_path, outname='test'+str(i), min_tps=2, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50)
 
     # write the clusters to a file
-    with open('clusters.txt', 'w') as f:
-        for i, cluster in enumerate(clusters):
-            f.write('Cluster'+str(i)+':\n')
-            for tp in cluster:
-                f.write(str(tp[0]) + ' ' + str(tp[1]) + ' ' + str(tp[2]) + ' ' + str(tp[3]) + ' ' + str(tp[4]) + ' ' + str(tp[5]) + ' ' + str(tp[6]) + ' ' + str(tp[7]) + '\n')
-            f.write('\n')
-    
+    if write:
+        with open('clusters.txt', 'w') as f:
+            for i, cluster in enumerate(clusters):
+                f.write('Cluster'+str(i)+':\n')
+                for tp in cluster:
+                    f.write(str(tp[0]) + ' ' + str(tp[1]) + ' ' + str(tp[2]) + ' ' + str(tp[3]) + ' ' + str(tp[4]) + ' ' + str(tp[5]) + ' ' + str(tp[6]) + ' ' + str(tp[7]) + '\n')
+                f.write('\n')
+        
+
+
+
+
+    # do some statistics on the clusters
+
+    n_spurious_clusters = 0
+    hist_types = np.array([0,0,0,0,0,0,0,0,0,0])
+    for cluster in clusters:
+        temp = cluster[0][7]
+        for tp in cluster:
+            if tp[7] != temp:
+                n_spurious_clusters += 1
+                break
+        else:
+            hist_types[cluster[0][7]] += 1
+    print('Number of clusters with different type: ', n_spurious_clusters)
+
+    print('Types: ', hist_types)
+
+    # create the dataset
+    dataset_img, dataset_label = create_dataset(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50)
+
+    np.save('dataset.npy', dataset_img)
+    np.save('labels.npy', dataset_label)
 
