@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import time
 import os
 import argparse
+import warnings
 
 # write a parser to set up the running from command line
 parser = argparse.ArgumentParser(description='Tranforms Trigger Primitives to images.')
@@ -64,18 +65,23 @@ def create_channel_map_array(chanMap):
     return channel_map
 
 
-def from_tp_to_imgs(tps, make_fixed_size=False, width=500, height=1000, x_margin=10, y_margin=500):
+def from_tp_to_imgs(tps, make_fixed_size=False, width=500, height=1000, x_margin=10, y_margin=100):
     '''
     :param tps: all trigger primitives to draw
+    :param make_fixed_size: if True, the image will have fixed size, otherwise it will be as big as the TPs
+    :param width: width of the image
+    :param height: height of the image
+    :param x_margin: margin on the x axis
+    :param y_margin: margin on the y axis
     :return: image
     '''
-    t_start = tps[0, 0] - y_margin
-    t_end = tps[-1, 0] + tps[-1, 1] + y_margin
+    t_start = tps[0, 0]
+    t_end = tps[-1, 0] + tps[-1, 1]
     
-    x_max = (tps[:, 3].max()+x_margin)
-    x_min = (tps[:, 3].min()-x_margin)
+    x_max = (tps[:, 3].max())
+    x_min = (tps[:, 3].min())
 
-    x_range = x_max - x_min
+    x_range = x_max - x_min 
     y_range = int((t_end - t_start))
 
     # create the image
@@ -83,21 +89,69 @@ def from_tp_to_imgs(tps, make_fixed_size=False, width=500, height=1000, x_margin
         img_width = width
         img_height = height
     else:
-        img_width = np.min([width, x_range + 2*x_margin])
-        img_height = np.min([height, y_range + 2*y_margin])
+        img_width =  x_range + 2*x_margin
+        img_height =  y_range + 2*y_margin
     img = np.zeros((img_height, img_width))
     # fill image
-    for tp in tps:
-        x = (tp[3] - x_min)/x_range * img_width
-        y_start = (tp[0] - t_start)/y_range * img_height
-        y_end = (tp[0] + tp[1] - t_start)/y_range * img_height
-        img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
+    if (not make_fixed_size):
+        for tp in tps:
+            x = (tp[3] - x_min) + x_margin
+            y_start = (tp[0] - t_start) + y_margin
+            y_end = (tp[0] + tp[1] - t_start) + y_margin
+            img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
 
+
+    else:
+    # We stretch the image inwards if needed but we do not upscale it. In this second case we build a padded image
+        if img_width < x_range:
+            stretch_x = True
+            print('Warning: image width is smaller than the range of the TPs. The image will be stretched inwards.')
+
+        else:
+            x_margin = (img_width - x_range)/2
+            stretch_x = False
+        
+        if img_height < y_range:
+            stretch_y = True
+            print('Warning: image height is smaller than the range of the TPs. The image will be stretched inwards.')
+
+        else:
+            y_margin = (img_height - y_range)/2
+            stretch_y = False
+
+
+        if stretch_x & stretch_y:
+            for tp in tps:
+                x=(tp[3] - x_min)/x_range * (img_width - 2*x_margin) + x_margin
+                y_start = (tp[0] - t_start)/y_range * (img_height - 2*y_margin) + y_margin
+                y_end = (tp[0] + tp[1] - t_start)/y_range * (img_height - 2*y_margin) + y_margin
+                img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
+        elif stretch_x:
+            for tp in tps:                
+                x=(tp[3] - x_min)/x_range * (img_width - 2*x_margin) + x_margin
+                y_start = (tp[0] - t_start) + y_margin
+                y_end = (tp[0] + tp[1] - t_start) + y_margin
+                img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
+        elif stretch_y:
+            for tp in tps:
+                x = (tp[3] - x_min) + x_margin
+                y_start = (tp[0] - t_start)/y_range * (img_height - 2*y_margin) + y_margin
+                y_end = (tp[0] + tp[1] - t_start)/y_range * (img_height - 2*y_margin) + y_margin
+                img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
+
+        else:
+            for tp in tps:
+                x = (tp[3] - x_min) + x_margin
+                y_start = (tp[0] - t_start) + y_margin
+                y_end = (tp[0] + tp[1] - t_start) + y_margin
+                img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
+   
     return img
 
 
 
-def all_views_img_maker(tps, channel_map, min_tps=2):
+
+def all_views_img_maker(tps, channel_map, min_tps=2, make_fixed_size=False, width=500, height=1000, x_margin=10, y_margin=200):
     '''
     :param tps: all trigger primitives in the event
     :param channel_map: channel map
@@ -116,19 +170,19 @@ def all_views_img_maker(tps, channel_map, min_tps=2):
     img_u, img_v, img_x = np.array([[-1]]), np.array([[-1]]), np.array([[-1]])
     
     if tps_u.shape[0] > min_tps:
-        img_u = from_tp_to_imgs(tps_u)
+        img_u = from_tp_to_imgs(tps_u, make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin )
 
     if tps_v.shape[0] > min_tps: 
-        img_v = from_tp_to_imgs(tps_v)
+        img_v = from_tp_to_imgs(tps_v, make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)
 
     if tps_x.shape[0] > min_tps:
-        img_x = from_tp_to_imgs(tps_x)
+        img_x = from_tp_to_imgs(tps_x, make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)
 
     return img_u, img_v, img_x
 
 
 
-def cluster_maker(all_tps, channel_map, ticks_limit=100, channel_limit=20, min_hits=2):
+def cluster_maker(all_tps, channel_map, ticks_limit=100, channel_limit=20, min_hits=3):
     '''
     :param all_tps: all trigger primitives in the event
     :param channel_map: channel map
@@ -147,26 +201,23 @@ def cluster_maker(all_tps, channel_map, ticks_limit=100, channel_limit=20, min_h
             buffer.append([tp])
         else:
             appended = False
-            for i, elem in enumerate(buffer):
+            buffer_copy = buffer.copy()
+            buffer = []
+            for i, elem in enumerate(buffer_copy):
                 if (tp[2] - elem[-1][2]) < ticks_limit:
-                    if abs(tp[3] - elem[-1][3]) < channel_limit: 
-                         
+                    if abs(tp[3] - elem[-1][3]) < channel_limit:                         
                         elem.append(tp)
                         appended = True
-                elif len(elem) > 3:
+                    buffer.append(elem)
+                elif len(elem) > min_hits:
                     clusters.append(elem)
-                    buffer.pop(i)
-
-                else:
-                    buffer.pop(i)
-
             if not appended:
                 buffer.append([tp])
 
     return clusters
 
 
-def show_or_save_img(all_TPs, channel_map, show=False, save=False, save_path='TP_to_img/images/', outname='test'):
+def show_or_save_img(all_TPs, channel_map, show=False, save=False, save_path='TP_to_img/images/', outname='test', min_tps=2, make_fixed_size=False, width=500, height=1000, x_margin=10, y_margin=200):
     '''
     :param img: image to show or save
     :param show: show the image
@@ -176,7 +227,7 @@ def show_or_save_img(all_TPs, channel_map, show=False, save=False, save_path='TP
     :return: None
     '''
     #create images
-    img_u, img_v, img_x = all_views_img_maker(all_TPs, channel_map)
+    img_u, img_v, img_x = all_views_img_maker(all_TPs, channel_map, min_tps=min_tps, make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)
 
     #show images
     if show:
@@ -206,6 +257,8 @@ def show_or_save_img(all_TPs, channel_map, show=False, save=False, save_path='TP
             plt.imsave(save_path + 'x_' + os.path.basename(outname) + '.png', img_x)
 
 
+
+
 if __name__=='__main__':
 
     #read first n_events lines in the data from txt, all are ints
@@ -214,15 +267,23 @@ if __name__=='__main__':
     else:
         all_TPs = np.loadtxt(filename, skiprows=0, dtype=int)
     
-    print(all_TPs.shape)
-    print(np.unique(all_TPs[:, 3]).shape)
+    all_TPs[:, 3] = all_TPs[:, 3]%2560
+
     #read channel map
     channel_map = create_channel_map_array(chanMap)
-    print(channel_map.shape)
-    print((channel_map[:, 0]))
-    
-    clusters = cluster_maker(all_TPs, channel_map)
-    for i, cluster in enumerate(clusters):
-        show_or_save_img(np.array(cluster), channel_map, show=show, save=save, save_path=save_path, outname='test'+str(i))
 
+    #create images
+    clusters = cluster_maker(all_TPs, channel_map, ticks_limit=150, channel_limit=20, min_hits=3)
+    print('Number of clusters: ', len(clusters))
+    for i, cluster in enumerate(clusters):
+        show_or_save_img(np.array(cluster), channel_map, show=show, save=save, save_path=save_path, outname='test'+str(i), min_tps=2, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50)
+
+    # write the clusters to a file
+    with open('clusters.txt', 'w') as f:
+        for i, cluster in enumerate(clusters):
+            f.write('Cluster'+str(i)+':\n')
+            for tp in cluster:
+                f.write(str(tp[0]) + ' ' + str(tp[1]) + ' ' + str(tp[2]) + ' ' + str(tp[3]) + ' ' + str(tp[4]) + ' ' + str(tp[5]) + ' ' + str(tp[6]) + ' ' + str(tp[7]) + '\n')
+            f.write('\n')
+    
 
