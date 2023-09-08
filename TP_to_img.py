@@ -14,7 +14,7 @@ parser.add_argument('-chanmap', type=str, default='FDHDChannelMap_v1_wireends.tx
 parser.add_argument('-show', action='store_true', help='show the image')
 parser.add_argument('-save', action='store_true', help='save the image')
 parser.add_argument('-write', action='store_true', help='write the clusters to a file')
-parser.add_argument('-save_path', type=str, default='images/', help='path to save the image')
+parser.add_argument('-save_path', type=str, default='/eos/user/d/dapullia/tp_dataset/', help='path to save the image')
 parser.add_argument('-n_events', type=int, default=0, help='number of events to process')
 
 args = parser.parse_args()
@@ -255,11 +255,11 @@ def show_or_save_img(all_TPs, channel_map, show=False, save=False, save_path='TP
             os.makedirs(save_path)
 
         if img_u[0, 0] != -1:
-            plt.imsave(save_path + 'u_' + os.path.basename(outname) + '.png', img_u)
+            plt.imsave(save_path +'images/'+ 'u_' + os.path.basename(outname) + '.png', img_u)
         if img_v[0, 0] != -1:
-            plt.imsave(save_path + 'v_' + os.path.basename(outname)+ '.png', img_v)
+            plt.imsave(save_path+'images/' + 'v_' + os.path.basename(outname)+ '.png', img_v)
         if img_x[0, 0] != -1:
-            plt.imsave(save_path + 'x_' + os.path.basename(outname) + '.png', img_x)
+            plt.imsave(save_path +'images/'+ 'x_' + os.path.basename(outname) + '.png', img_x)
 
 
 def create_dataset(clusters, make_fixed_size=True, width=70, height=1000, x_margin=5, y_margin=50):
@@ -391,18 +391,19 @@ def create_dataset4(clusters, make_fixed_size=True, width=70, height=1000, x_mar
     # create the full array beforehands
     dataset_img = np.empty((len(clusters), height, width))
     dataset_label = np.empty((len(clusters), 1))
+    i=0
+    for cluster in (clusters):
+        # create the label
+        if len(np.unique(np.array(cluster)[:, 7])) > 1:
+            label = 10
+        else:
+            label = cluster[0][7]        
 
-    # for i,  cluster in enumerate(clusters):
-    #     # create the image
-    #     img = from_tp_to_imgs(np.array(cluster), make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)
-    #     # create the label
-    #     if len(np.unique(np.array(cluster)[:, 7])) > 1:
-    #         label = 10
-    #     else:
-    #         label = cluster[0][7]        
-    #     # append to the dataset as an array of arrays
-    #     dataset_img[i] = img
-    #     dataset_label[i] = [label]
+        # append to the dataset as an array of arrays
+        dataset_img[i] = (from_tp_to_imgs(np.array(cluster), make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin))
+        dataset_label[i] = [label]
+        
+        i+=1
 
     print( dataset_img.size * dataset_img.itemsize/10e9)
 
@@ -476,8 +477,8 @@ if __name__=='__main__':
     print('Dataset shape: ', (dataset_img).shape)
     print('Labels shape: ', (dataset_label).shape)
 
-    np.save('dataset_img.npy', dataset_img)
-    np.save('dataset_lab.npy', dataset_label)
+    np.save('/eos/user/d/dapullia/tp_dataset/dataset_img.npy', dataset_img)
+    np.save('/eos/user/d/dapullia/tp_dataset/dataset_lab.npy', dataset_label)
 
     print("Done!")
 
