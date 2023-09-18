@@ -13,9 +13,6 @@ parser.add_argument('-save', action='store_true', help='save the image')
 parser.add_argument('-save_path', type=str, default='TP_to_img/images/', help='path to save the image')
 parser.add_argument('-n_events', type=int, default=1000, help='number of events to process')
 
-
-
-
 args = parser.parse_args()
 # unpack the arguments
 filename = args.filename
