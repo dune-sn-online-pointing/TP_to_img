@@ -14,6 +14,9 @@ seed = 42
 np.random.seed(seed)
 tf.random.set_seed(seed)
 
+
+
+
 '''
 Image shape: (, 1000, 70)
 '''
