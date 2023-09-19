@@ -3,3 +3,5 @@ fd-snb-mc-hits.tar
 snana_hits_apa100.txt
 snana_hits.txt
 /images
+*.png
+*.h5
