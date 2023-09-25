@@ -5,3 +5,5 @@ snana_hits.txt
 /images
 *.png
 *.h5
+/__pycache__
+test.py
