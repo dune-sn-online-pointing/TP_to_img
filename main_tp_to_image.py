@@ -11,18 +11,18 @@ import TP_to_img as tp2img
 
 # write a parser to set up the running from command line
 parser = argparse.ArgumentParser(description='Tranforms Trigger Primitives to images.')
-parser.add_argument('-input_file', type=str, help='Input file name', default='snana_hits.txt')
-parser.add_argument('-input_path', type=str, help='Input file path', default='/eos/user/d/dapullia/tp_dataset/')
-parser.add_argument('-chanmap', type=str, default='FDHDChannelMap_v1_wireends.txt', help='path to the file with Channel Map')
-parser.add_argument('-show', action='store_true', help='show the image')
-parser.add_argument('-save_img', action='store_true', help='save the image')
-parser.add_argument('-save_ds', action='store_true', help='save the dataset')
-parser.add_argument('-write', action='store_true', help='write the clusters to a file')
-parser.add_argument('-save_path', type=str, default='/eos/user/d/dapullia/tp_dataset/', help='path to save the image')
-parser.add_argument('-img_save_folder', type=str, default='images/', help='folder to save the image')
-parser.add_argument('-img_save_name', type=str, default='image', help='name to save the image')
-parser.add_argument('-n_events', type=int, default=0, help='number of events to process')
-parser.add_argument('-min_tps_to_cluster', type=int, default=4, help='minimum number of TPs to create a cluster')
+parser.add_argument('--input_file', type=str, help='Input file name', default='snana_hits.txt')
+parser.add_argument('--input_path', type=str, help='Input file path', default='/eos/user/d/dapullia/tp_dataset/')
+parser.add_argument('--chanmap', type=str, default='FDHDChannelMap_v1_wireends.txt', help='path to the file with Channel Map')
+parser.add_argument('--show', action='store_true', help='show the image')
+parser.add_argument('--save_img', action='store_true', help='save the image')
+parser.add_argument('--save_ds', action='store_true', help='save the dataset')
+parser.add_argument('--write', action='store_true', help='write the clusters to a file')
+parser.add_argument('--save_path', type=str, default='/eos/user/d/dapullia/tp_dataset/', help='path to save the image')
+parser.add_argument('--img_save_folder', type=str, default='images/', help='folder to save the image')
+parser.add_argument('--img_save_name', type=str, default='image', help='name to save the image')
+parser.add_argument('--n_events', type=int, default=0, help='number of events to process')
+parser.add_argument('--min_tps_to_cluster', type=int, default=4, help='minimum number of TPs to create a cluster')
 
 args = parser.parse_args()
 # unpack the arguments
@@ -67,7 +67,7 @@ TP format (tpstream):
 
 
 '''
-Channel Map format:
+Channel Map format (apa):
 [0] offlchan    in gdml and channel sorting convention
 [1] upright     0 for inverted, 1 for upright
 [2] wib         1, 2, 3, 4 or 5  (slot number +1?)
@@ -92,13 +92,15 @@ if __name__=='__main__':
     else:
         all_TPs = np.loadtxt(filename, skiprows=0, dtype=int)
     
-    all_TPs[:, 3] = all_TPs[:, 3]%2560
-
     #read channel map
     channel_map = tp2img.create_channel_map_array(chanMap)
+    # The line below is needed because the channel map is not the same (pain)
+    channel_map[:,6] = channel_map[:,7]
+
 
     #create images
-    clusters = tp2img.cluster_maker(all_TPs, channel_map, ticks_limit=150, channel_limit=20, min_tps_to_cluster=min_tps_to_cluster)
+    # clusters = tp2img.cluster_maker(all_TPs, channel_map, ticks_limit=550, channel_limit=20, min_tps_to_cluster=min_tps_to_cluster)
+    clusters = tp2img.cluster_maker_only_by_time(all_TPs, channel_map, ticks_limit=400, channel_limit=20, min_tps_to_cluster=min_tps_to_cluster)
     print('Number of clusters: ', len(clusters))
     for i, cluster in enumerate(clusters):
         if show:
@@ -145,6 +147,9 @@ if __name__=='__main__':
         print('Labels shape: ', (dataset_label).shape)            
         np.save(save_path + 'dataset_img.npy', dataset_img)
         np.save(save_path + 'dataset_lab.npy', dataset_label)
+        
+        print(np.unique(dataset_label,return_counts=True))
+       
 
     print("Done!")
 

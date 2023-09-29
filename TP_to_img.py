@@ -69,7 +69,7 @@ def from_tp_to_imgs(tps, make_fixed_size=False, width=500, height=1000, x_margin
     if y_max_overall != -1:
         t_end = y_max_overall
     else:
-        t_end = tps[-1, 0] + tps[-1, 1]
+        t_end = np.max(tps[:, 0] + tps[:, 1])
     
     x_max = (tps[:, 3].max())
     x_min = (tps[:, 3].min())
@@ -91,7 +91,7 @@ def from_tp_to_imgs(tps, make_fixed_size=False, width=500, height=1000, x_margin
             x = (tp[3] - x_min) + x_margin
             y_start = (tp[0] - t_start) + y_margin
             y_end = (tp[0] + tp[1] - t_start) + y_margin
-            img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
+            img[int(y_start)-1:int(y_end)-1, int(x)-1] = tp[4]/(y_end - y_start)
 
 
     else:
@@ -118,26 +118,26 @@ def from_tp_to_imgs(tps, make_fixed_size=False, width=500, height=1000, x_margin
                 x=(tp[3] - x_min)/x_range * (img_width - 2*x_margin) + x_margin
                 y_start = (tp[0] - t_start)/y_range * (img_height - 2*y_margin) + y_margin
                 y_end = (tp[0] + tp[1] - t_start)/y_range * (img_height - 2*y_margin) + y_margin
-                img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
+                img[int(y_start)-1:int(y_end)-1, int(x)-1] = tp[4]/(y_end - y_start)
         elif stretch_x:
             for tp in tps:                
                 x=(tp[3] - x_min)/x_range * (img_width - 2*x_margin) + x_margin
                 y_start = (tp[0] - t_start) + y_margin
                 y_end = (tp[0] + tp[1] - t_start) + y_margin
-                img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
+                img[int(y_start)-1:int(y_end)-1, int(x)-1] = tp[4]/(y_end - y_start)
         elif stretch_y:
             for tp in tps:
                 x = (tp[3] - x_min) + x_margin
                 y_start = (tp[0] - t_start)/y_range * (img_height - 2*y_margin) + y_margin
                 y_end = (tp[0] + tp[1] - t_start)/y_range * (img_height - 2*y_margin) + y_margin
-                img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
+                img[int(y_start):int(y_end)-1, int(x)-1] = tp[4]/(y_end - y_start)
 
         else:
             for tp in tps:
                 x = (tp[3] - x_min) + x_margin
                 y_start = (tp[0] - t_start) + y_margin
                 y_end = (tp[0] + tp[1] - t_start) + y_margin
-                img[int(y_start):int(y_end), int(x)] = tp[4]/(y_end - y_start)
+                img[int(y_start)-1:int(y_end)-1, int(x)-1] = tp[4]/(y_end - y_start)
    
     return img
 
@@ -169,8 +169,7 @@ def all_views_img_maker(tps, channel_map, min_tps_to_create_img=2, make_fixed_si
 
 
     y_min_overall = tps[0,0]
-    y_max_overall = tps[-1,0] + tps[-1,1]
-
+    y_max_overall = np.max(tps[:,0] + tps[:,1])
 
     if tps_u.shape[0] >= min_tps_to_create_img:
         img_u = from_tp_to_imgs(tps_u, make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin, y_min_overall=y_min_overall, y_max_overall=y_max_overall)
@@ -182,6 +181,7 @@ def all_views_img_maker(tps, channel_map, min_tps_to_create_img=2, make_fixed_si
         img_x = from_tp_to_imgs(tps_x, make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin, y_min_overall=y_min_overall, y_max_overall=y_max_overall)
 
     return img_u, img_v, img_x
+
 
 
 
@@ -201,24 +201,73 @@ def cluster_maker(all_tps, channel_map, ticks_limit=100, channel_limit=20, min_t
     # loop over the TPs
     for tp in all_tps:
         tp = [tp[0], tp[1], tp[2], tp[3], tp[4], tp[5], tp[6], tp[7]]
+        tp_type = channel_map[tp[3], 6]
         if len(buffer) == 0:
             buffer.append([tp])
+            
         else:
             appended = False
             buffer_copy = buffer.copy()
             buffer = []
             for i, elem in enumerate(buffer_copy):
-                if (tp[2] - elem[-1][2]) < ticks_limit:
-                    if abs(tp[3] - elem[-1][3]) < channel_limit:                         
-                        elem.append(tp)
-                        appended = True
-                    buffer.append(elem)
+                there_is_u = False
+                there_is_v = False
+                there_is_x = False
+                if (tp[0] - elem[-1][0]-elem[-1][1]) < ticks_limit:
+                # if abs(tp[2] - elem[-1][2]) < ticks_limit:
+                    for tp_i in elem:
+                        if channel_map[tp_i[3], 6] ==0:
+                            there_is_u = True
+                        elif channel_map[tp_i[3], 6] ==1:
+                            there_is_v = True
+                        elif channel_map[tp_i[3], 6] ==2:
+                            there_is_x = True
+
+                        if (tp_type == tp_i[3]):
+                            if abs(tp[3] - tp_i[3]) < channel_limit:                         
+                                elem.append(tp)
+                                appended = True
+                            buffer.append(elem)
+                            break
+                    else:
+                        if (tp_type == 0) and (not there_is_u):
+                            elem.append(tp)
+                            appended = True
+                            buffer.append(elem)
+                        elif (tp_type == 1) and (not there_is_v):
+                            elem.append(tp)
+                            appended = True
+                            buffer.append(elem)
+                        elif (tp_type == 2) and (not there_is_x):
+                            elem.append(tp)
+                            appended = True
+                            buffer.append(elem)
+                        else:
+                            buffer.append(elem)
                 elif len(elem) >= min_tps_to_cluster:
                     clusters.append(elem)
             if not appended:
                 buffer.append([tp])
-    
+
     return clusters
+
+def cluster_maker_only_by_time(all_tps, channel_map, ticks_limit=100, channel_limit=20, min_tps_to_cluster=4):
+    clusters = []
+    current_cluster = np.array([[all_tps[0][0], all_tps[0][1], all_tps[0][2], all_tps[0][3], all_tps[0][4], all_tps[0][5], all_tps[0][6], all_tps[0][7]]])
+    for tp in all_tps[1:]:
+        tp = [tp[0], tp[1], tp[2], tp[3], tp[4], tp[5], tp[6], tp[7]]
+        if (tp[0] - np.max(current_cluster[:, 0]+current_cluster[:,1])) < ticks_limit:
+            current_cluster = np.append(current_cluster, [tp], axis=0)
+        else:
+            if len(current_cluster) >= min_tps_to_cluster:
+                clusters.append(current_cluster)
+            current_cluster = np.array([tp])
+            
+
+    return clusters
+
+
+
 
 
 
@@ -325,7 +374,7 @@ def save_img(all_TPs, channel_map,save_path, outname='test', min_tps_to_create_i
 
 
     if n_views > 1:
-        fig = plt.figure(figsize=(10, 16))
+        fig = plt.figure(figsize=(10, 26))
         grid = ImageGrid(fig, 111,          # as in plt.subplot(111)
                         nrows_ncols=(1,3),
                         axes_pad=0.5,
@@ -368,15 +417,20 @@ def create_dataset(clusters, channel_map, make_fixed_size=True, width=70, height
     # create the full array beforehands
     # dataset_img = np.empty((len(clusters), height, width))
     # as above but with 3 channels
-    dataset_img = np.empty((len(clusters), height, width, 3))
-    dataset_label = np.empty((len(clusters), 1))
+    dataset_img = np.zeros((len(clusters), height, width, 3), dtype=np.uint8)
+    dataset_label = np.empty((len(clusters), 1), dtype=np.uint8)
     i=0
     for cluster in (clusters):
         # create the label
-        if len(np.unique(np.array(cluster)[:, 7])) > 1:
-            label = 10
+        # if len(np.unique(np.array(cluster)[:, 7])) > 1:
+        #     label = 10
+        # else:
+        #     label = cluster[0][7]        
+        if len(cluster) > 20:
+            label = 1
         else:
-            label = cluster[0][7]        
+            label = 0
+
 
         # append to the dataset as an array of arrays
         img_u, img_v, img_x = all_views_img_maker(np.array(cluster), channel_map, make_fixed_size=make_fixed_size, width=width, height=height, x_margin=x_margin, y_margin=y_margin)
